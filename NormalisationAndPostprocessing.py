@@ -19,8 +19,10 @@ os.makedirs(updated_dataset_dir, exist_ok=True)
 print(os.listdir(updated_dataset_dir))
 
 # 440 format dimensions for height and width
-H = 440.0
-B = 440.0
+#H = 440.0
+#B = 440.0
+H = 3840.0
+B = 2160.0
 
 #Part1: Normalizing the labels 
 def get_label_names(folder_path, format=".txt"):
@@ -134,7 +136,7 @@ def update_normalize_xy(param, side_size, dimension="X", H=440., B=440.):
     else:
         raise ValueError("Dimension must be 'X' or 'Y'")
 
-def change_label_content(path, updated_path):
+def change_label_content(path, updated_path, H, B):
     """
     Updates the label content with normalized coordinates and side sizes.
 
@@ -165,8 +167,8 @@ def change_label_content(path, updated_path):
             side_size_y = float(i.split(" ")[6])
 
             # Normalize the x and y coordinates
-            updated_x = update_normalize_xy(updated_x, side_size_x, "X")
-            updated_y = update_normalize_xy(updated_y, side_size_y, "Y")
+            updated_x = update_normalize_xy(updated_x, side_size_x, "X", H, B)
+            updated_y = update_normalize_xy(updated_y, side_size_y, "Y", H, B)
 
             # Normalize the side sizes (assuming H and B are global or defined elsewhere)
             side_size_x = side_size_x / H
@@ -375,6 +377,7 @@ def update_label_id(label_names, path, product_type_id):
     names = {}
     # Loop through each label name in the provided list
     for index in range(len(label_names)):
+        matching_lines = []
         # Open the current label file in read mode
         with open(path + "/" + label_names[index], "r") as fileref:
             # Initialize an empty string to store the new label content
@@ -388,17 +391,16 @@ def update_label_id(label_names, path, product_type_id):
                     st_helper1= int(i.split()[2]) - 1
                     st_helper2 = " ".join(i.split()[3:])
                     st = (str(st_helper1) + " " + str(st_helper2))
-
+                    matching_lines.append(st)
                     names[st_helper1] = i.split()[0]
-                else:
-                    if not st: # if the string is empty
-                        st = "" # string should stay empty
+                #else:
+                    #if not st: # if the string is empty
+                        #st = "" # string should stay empty
 
         # Open the same file in write mode to update its content
         with open(path + "/" + label_names[index], 'w') as file:
             # Write the updated string to the file
-            file.write(st)
-    #print(names)
+            file.write("\n".join(matching_lines))
     return names
 
 def update_label_names(label_names, path, product_type_list_names=[]):
@@ -428,6 +430,7 @@ def update_label_names(label_names, path, product_type_list_names=[]):
 
     # Loop through each label name in the provided list
     for index in range(len(label_names)):
+        matching_lines = []
         # Open the current label file in read mode
         with open(path + "/" + label_names[index], "r") as fileref:
             # Read each line in the file
@@ -435,28 +438,24 @@ def update_label_names(label_names, path, product_type_list_names=[]):
                 # Check if the second element in the line matches the product_type_id
                 for j in product_type_list_names: # Sink
                     if products[j] == int(i.split()[1]):
-
                         newID = newLabel_from0.get(j)
                         st_helper1 = str(newID)
                         # Update the string with the elements after the third one
                         st_helper2 = " ".join(i.split()[3:])
                         # Update the string with the elements after the third one
                         st = (str(st_helper1) + " " + str(st_helper2))
-
+                        matching_lines.append(st)
                         names[newID] = newGroup_from0[newID]
-                    else:
-                        if not st: # if the string is empty
-                            st = "" # string should stay empty
+                    #else:
+                        #if not st: # if the string is empty
+                            #st = "" # string should stay empty
 
 
         # Open the same file in write mode to update its content
         with open(path + "/" + label_names[index], 'w') as file:
             # Write the updated string to the file
-            file.write(st)
+            file.write("\n".join(matching_lines))
     return names
-
-
-
 
 
 def create_yolo_training_config(folder_path, product_specific=False, product_type_id=None, product_type_list_names=None):
@@ -490,7 +489,7 @@ def create_yolo_training_config(folder_path, product_specific=False, product_typ
 
     labels_names_val, labels_names_train = split_data()
 
-    products = {"Toilet":0, "Bathtub":1, "Sink":2}
+    products = {"Toilet":0, "Bathtub":1, "Sink":2, "Vanity":3, "Faucet":4, "Shelf":5}
 
     if product_specific==True:
         # Update label IDs for validation and training sets
@@ -516,7 +515,6 @@ def create_yolo_training_config(folder_path, product_specific=False, product_typ
 
     yaml.add_representer(OrderedDict, represent_ordereddict)
 
-
     # Write the configuration to a YAML file
     with open('data.yaml', 'w') as file:
         yaml.dump(yolo_config, file, default_flow_style=False)
@@ -529,12 +527,12 @@ for i in get_label_names(dataset_dir, format=".txt"):
   path = dataset_dir + "/" + i
   path = "dataset" + "/" + i
   updated_path = "updatedDataset" + "/" + i
-  change_label_content(path, updated_path)
+  change_label_content(path, updated_path, H, B)
   #copy images in folder with normalized labels
 copy_all_images(dataset_dir, updated_dataset_dir, get_jpg_image_names(dataset_dir))
 
 
 products = {"Toilet":0, "Bathtub":1, "Sink":2, "Vanity":3, "Faucet":4, "Shelf":5}
-create_yolo_training_config("updatedDataset", product_specific=False, product_type_list_names=["Toilet", "Bathtub", "Sink"]) #, "Vanity", "Faucet", "Shelf"
+create_yolo_training_config("updatedDataset", product_specific=False, product_type_list_names=["Toilet", "Bathtub", "Sink", "Vanity", "Faucet", "Shelf"]) #, "Vanity", "Faucet", "Shelf"
 #create_yolo_training_config("updatedDataset", product_specific=True, product_type_id=products["Toilet"])
 
